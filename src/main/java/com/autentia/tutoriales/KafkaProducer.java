@@ -33,6 +33,8 @@ public class KafkaProducer {
     }
     
     public static void main(String[] args) {
+    	// Mensaje simple
 		new KafkaProducer().send(Constantes.TOPIC, "esto es un test");
+		
 	}
 }
