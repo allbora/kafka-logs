@@ -4,16 +4,19 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
+import com.ibr.common.Constantes;
+
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetRequest;
+import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
-
-import org.apache.log4j.Logger;
 
 public class KafkaConsumer {
 
@@ -24,7 +27,6 @@ public class KafkaConsumer {
 	private static final int TIMEOUT = 100000;
 	private static final int PARTITION = 1;
 	private static final int PORT = 9092;
-	private static final String TOPIC = "test";
 	private static final String BROKER = "localhost";
 	private static final String CLIENT = "testClient";
 	private final SimpleConsumer consumer;
@@ -38,10 +40,10 @@ public class KafkaConsumer {
 
 		//consumer never stops
 		while (true) {
-			final FetchRequest req = new FetchRequestBuilder().clientId(CLIENT).addFetch(TOPIC, PARTITION, readOffset, FETCH_SIZE) .build();
+			final FetchRequest req = new FetchRequestBuilder().clientId(CLIENT).addFetch(Constantes.TOPIC, PARTITION, readOffset, FETCH_SIZE) .build();
 			final FetchResponse fetchResponse = consumer.fetch(req);
 
-			for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(TOPIC, PARTITION)) {
+			for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(Constantes.TOPIC, PARTITION)) {
 				long currentOffset = messageAndOffset.offset();
 				if (currentOffset < readOffset) {
 					continue;
@@ -59,17 +61,32 @@ public class KafkaConsumer {
 	}
 
 	public static long getLastOffset(SimpleConsumer consumer, long whichTime) {
-		final TopicAndPartition topicAndPartition = new TopicAndPartition(TOPIC, PARTITION);
-		final Map<TopicAndPartition, PartitionOffsetRequestInfo> requestInfo = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
-		requestInfo.put(topicAndPartition, new PartitionOffsetRequestInfo(whichTime, MAX_NUM_OFFSETS));
-		
-		final OffsetRequest offsetRequest = new OffsetRequest(requestInfo, kafka.api.OffsetRequest.CurrentVersion(), CLIENT);
-		
-		return consumer.getOffsetsBefore(offsetRequest).offsets(TOPIC, PARTITION)[0];
+		long result = 0; 
+		try {
+			final TopicAndPartition topicAndPartition = new TopicAndPartition(Constantes.TOPIC, PARTITION);
+			final Map<TopicAndPartition, PartitionOffsetRequestInfo> requestInfo = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
+			requestInfo.put(topicAndPartition, new PartitionOffsetRequestInfo(whichTime, MAX_NUM_OFFSETS));
+			
+			final OffsetRequest offsetRequest = new OffsetRequest(requestInfo, kafka.api.OffsetRequest.CurrentVersion(), CLIENT);
+			
+			OffsetResponse offsetsBefore = consumer.getOffsetsBefore(offsetRequest);
+			if (!offsetsBefore.hasError()) {
+				return offsetsBefore.offsets(Constantes.TOPIC, PARTITION)[0];
+			}
+			else {
+				log.error("IBR >> Error: " + offsetsBefore.toString());
+			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			log.error("IBR >> Error getLastOffset:" + e);
+			e.printStackTrace();
+		}
+		return result; 
 	}
 	
 	public static void main(String args[]) {
 		try {
+			log.info("IBR >> RUN!!!");
 			new KafkaConsumer().run();
 		} catch (Exception e) {
 			log.error("Error:" + e);
